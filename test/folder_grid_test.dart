@@ -16,6 +16,7 @@ void main() {
     required void Function(ImageEntry, FolderEntry) onDrop,
     VoidCallback? onCreate,
     ValueChanged<FolderEntry>? onOpen,
+    void Function(FolderEntry)? onAssignFocused,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -32,6 +33,7 @@ void main() {
                 plan: plan,
                 onDrop: onDrop,
                 onOpen: onOpen ?? (_) {},
+                onAssignFocused: onAssignFocused,
                 onCreate: onCreate ?? () {},
               ),
             ),
@@ -87,14 +89,56 @@ void main() {
     expect(find.text('4 +1'), findsOneWidget);
   });
 
-  testWidgets('tapping a tile opens it', (tester) async {
+  testWidgets('long-pressing a tile opens its queue', (tester) async {
+    // This was the tap. Filing is done hundreds of times in a sitting and
+    // opening a queue only when something has gone wrong, so filing took the
+    // cheaper gesture and opening moved here.
     FolderEntry? opened;
     await tester.pumpWidget(harness(
       plan: const SortPlan(),
       onDrop: (_, _) {},
       onOpen: (f) => opened = f,
     ));
+    await tester.longPress(find.text('Memes'));
+    await tester.pump();
+    expect(opened?.path, '/root/Memes');
+  });
+
+  testWidgets('tapping a tile files the focused image', (tester) async {
+    FolderEntry? filed;
+    FolderEntry? opened;
+    await tester.pumpWidget(harness(
+      plan: const SortPlan(),
+      onDrop: (_, _) {},
+      onOpen: (f) => opened = f,
+      onAssignFocused: (f) => filed = f,
+    ));
     await tester.tap(find.text('Memes'));
+    await tester.pump();
+    expect(filed?.path, '/root/Memes');
+    // And emphatically not the other one: the whole point of the swap is that
+    // a tap no longer opens anything.
+    expect(opened, isNull);
+  });
+
+  testWidgets('a tap does nothing when no image is focused', (tester) async {
+    // An empty strip, or everything already filed. A tap that silently does
+    // nothing is worse than a tile that is plainly not tappable, so onTap is
+    // null rather than a no-op callback.
+    FolderEntry? opened;
+    await tester.pumpWidget(harness(
+      plan: const SortPlan(),
+      onDrop: (_, _) {},
+      onOpen: (f) => opened = f,
+      onAssignFocused: null,
+    ));
+    await tester.tap(find.text('Memes'));
+    await tester.pump();
+    expect(opened, isNull);
+
+    // Long-press still works, so a misdrop can still be undone with nothing
+    // focused -- which is exactly when you would need to.
+    await tester.longPress(find.text('Memes'));
     await tester.pump();
     expect(opened?.path, '/root/Memes');
   });

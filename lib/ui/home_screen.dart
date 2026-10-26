@@ -26,6 +26,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _root;
   Library? _library;
   SortPlan _plan = const SortPlan();
+
+  /// The image the filmstrip has centred, which a tap on a folder files.
+  ImageEntry? _focused;
   List<String> _recentRoots = const [];
 
   bool _scanning = false;
@@ -195,6 +198,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Files the centred image into [folder].
+  ///
+  /// The same assignment a drop makes, so an image filed by tapping is
+  /// indistinguishable from one dragged — it keeps its badge, stays in the
+  /// strip, and comes back out the same way.
+  void _assignFocused(FolderEntry folder) {
+    final image = _focused;
+    if (image == null) return;
+    setState(() => _plan = _plan.assign(image.path, folder.path));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_granted == null) {
@@ -277,6 +291,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               setState(() => _plan = _plan.unassign(image.path)),
                           onDragStarted: () => setState(() => _dragging = true),
                           onDragEnded: () => setState(() => _dragging = false),
+                          onFocusedChanged: (image) =>
+                              setState(() => _focused = image),
                         ),
                       ),
                       _StripCaption(
@@ -293,6 +309,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 onDrop: (image, folder) => setState(
                                     () => _plan = _plan.assign(image.path, folder.path)),
                                 onOpen: _openQueue,
+                                onAssignFocused:
+                                    _focused == null ? null : _assignFocused,
                                 onCreate: _createFolder,
                               ),
                       ),

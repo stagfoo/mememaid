@@ -23,6 +23,7 @@ class Filmstrip extends StatefulWidget {
     required this.onUnassign,
     required this.onDragStarted,
     required this.onDragEnded,
+    required this.onFocusedChanged,
   });
 
   final List<ImageEntry> images;
@@ -34,6 +35,13 @@ class Filmstrip extends StatefulWidget {
   final ValueChanged<ImageEntry> onUnassign;
   final VoidCallback onDragStarted;
   final VoidCallback onDragEnded;
+
+  /// The centred image, whenever it changes. Null when the strip is empty.
+  ///
+  /// The strip has always known which card is the big one -- it is what the
+  /// scale maths is built on -- but nothing outside it did, so tapping a folder
+  /// had no way to know what it was being asked to file.
+  final ValueChanged<ImageEntry?> onFocusedChanged;
 
   @override
   State<Filmstrip> createState() => FilmstripState();
@@ -49,13 +57,42 @@ class FilmstripState extends State<Filmstrip> {
   /// first layout, when `controller.page` is still null.
   double _page = 0;
 
+  /// Which card the strip last reported as focused.
+  ///
+  /// Kept so the callback fires on the card changing rather than on every
+  /// scroll frame: the page value moves continuously under a finger, and
+  /// telling the parent sixty times a swipe would rebuild the folder grid for
+  /// every one of them.
+  int? _reportedIndex;
+
   @override
   void initState() {
     super.initState();
     _controller.addListener(() {
       final page = _controller.page;
-      if (page != null && page != _page) setState(() => _page = page);
+      if (page != null && page != _page) {
+        setState(() => _page = page);
+        _reportFocused();
+      }
     });
+    // The first card is focused before anything is scrolled, and nothing else
+    // would ever announce it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportFocused());
+  }
+
+  void _reportFocused() {
+    if (!mounted) return;
+    if (widget.images.isEmpty) {
+      if (_reportedIndex != null) {
+        _reportedIndex = null;
+        widget.onFocusedChanged(null);
+      }
+      return;
+    }
+    final index = _page.round().clamp(0, widget.images.length - 1);
+    if (index == _reportedIndex) return;
+    _reportedIndex = index;
+    widget.onFocusedChanged(widget.images[index]);
   }
 
   @override
@@ -72,6 +109,14 @@ class FilmstripState extends State<Filmstrip> {
           _controller.jumpToPage(target.round());
         }
       });
+    }
+    // The list changing puts a different image under the centre even when the
+    // page number has not moved -- after an Apply, most obviously. Forcing a
+    // re-report keeps whatever taps a folder next from filing the image that
+    // was there before.
+    if (widget.images != oldWidget.images) {
+      _reportedIndex = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reportFocused());
     }
   }
 

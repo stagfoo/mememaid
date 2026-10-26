@@ -13,6 +13,7 @@ class FolderGrid extends StatelessWidget {
     required this.plan,
     required this.onDrop,
     required this.onOpen,
+    required this.onAssignFocused,
     required this.onCreate,
   });
 
@@ -20,9 +21,19 @@ class FolderGrid extends StatelessWidget {
   final SortPlan plan;
   final void Function(ImageEntry image, FolderEntry folder) onDrop;
 
-  /// Tapping a tile that has images queued opens the queue so they can be
+  /// Long-pressing a tile that has images queued opens the queue so they can be
   /// taken back out — the only way to undo a misdrop you've scrolled past.
+  ///
+  /// Was the tap, until tapping became the way to file the focused image. Of
+  /// the two, filing is the one done hundreds of times in a sitting and opening
+  /// a queue is the one done when something has gone wrong, so filing gets the
+  /// cheaper gesture.
   final ValueChanged<FolderEntry> onOpen;
+
+  /// Files the focused image into this folder. Null when nothing is focused —
+  /// an empty strip, or every image already filed — and the tile then has no
+  /// tap at all rather than a tap that silently does nothing.
+  final void Function(FolderEntry folder)? onAssignFocused;
 
   final VoidCallback onCreate;
 
@@ -44,7 +55,10 @@ class FolderGrid extends StatelessWidget {
           folder: folder,
           queued: plan.imagesFor(folder.path),
           onDrop: (image) => onDrop(image, folder),
-          onTap: () => onOpen(folder),
+          onTap: onAssignFocused == null
+              ? null
+              : () => onAssignFocused!(folder),
+          onLongPress: () => onOpen(folder),
         );
       },
     );
@@ -57,12 +71,16 @@ class _FolderTile extends StatelessWidget {
     required this.queued,
     required this.onDrop,
     required this.onTap,
+    required this.onLongPress,
   });
 
   final FolderEntry folder;
   final List<String> queued;
   final ValueChanged<ImageEntry> onDrop;
-  final VoidCallback onTap;
+  /// Null when there is nothing focused to file.
+  final VoidCallback? onTap;
+
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +114,7 @@ class _FolderTile extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
+                onLongPress: onLongPress,
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: Column(
