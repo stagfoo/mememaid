@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The drawing is black ink with no fill of its own, so the icon
+         needs a field behind it or the launcher shows the ink floating
+         on whatever wallpaper happens to be there. -->
+    <color name="ic_launcher_background">#FFFFFFFF</color>
+</resources>
